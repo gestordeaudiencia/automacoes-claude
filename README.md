@@ -5,7 +5,7 @@
 [![tests](https://img.shields.io/badge/tests-16%20passing-brightgreen)](.github/workflows/test.yml)
 [![python](https://img.shields.io/badge/python-3.11%2B-blue)](pyproject.toml)
 [![license](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-[![template](https://img.shields.io/badge/use-template-orange)](https://github.com/SEU_USER/automacoes-claude/generate)
+[![template](https://img.shields.io/badge/use-template-orange)](https://github.com/gestordeaudiencia/automacoes-claude/generate)
 
 ---
 
@@ -63,7 +63,7 @@ FastAPI server com endpoint único `POST /webhook/{platform}` que:
 ## Quickstart (5 minutos)
 
 ```bash
-git clone https://github.com/SEU_USER/automacoes-claude
+git clone https://github.com/gestordeaudiencia/automacoes-claude
 cd automacoes-claude
 cp .env.example .env       # preencha as chaves
 uv sync
