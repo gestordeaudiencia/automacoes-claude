@@ -1,144 +1,120 @@
 # automacoes-claude
 
-> **Toolkit Python multi-plataforma pra automação de operações comerciais.** Substitui fluxos n8n por código auditável, versionado, sem lock-in. Recovery de pagamento, webhooks de checkout e follow-up automático em ~750 linhas de Python.
+> **Cloudflare Worker** que recebe webhooks de plataformas de pagamento (Kiwify, Hotmart, Shopify, Lastlink) e dispara workflows no **GoHighLevel**. Validação HMAC nativa, deploy zero-ops, custo praticamente zero.
 
-[![tests](https://img.shields.io/badge/tests-16%20passing-brightgreen)](.github/workflows/test.yml)
-[![python](https://img.shields.io/badge/python-3.11%2B-blue)](pyproject.toml)
+[![tests](https://img.shields.io/badge/tests-19%20passing-brightgreen)](.github/workflows/test.yml)
+[![runtime](https://img.shields.io/badge/runtime-cloudflare%20workers-orange)](https://workers.cloudflare.com/)
 [![license](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-[![template](https://img.shields.io/badge/use-template-orange)](https://github.com/gestordeaudiencia/automacoes-claude/generate)
 
 ---
 
-## Manifesto
+## Arquitetura
 
-n8n resolve bem o **primeiro** workflow. Quando a operação cresce, vira passivo:
+```
+[Kiwify | Hotmart | Shopify | Lastlink]
+        │ webhook
+        ▼
+[Cloudflare Worker] ←─ você só mantém isto (~400 linhas TS)
+   • valida HMAC
+   • normaliza payload
+   • upsert contato no GHL + adiciona tags
+        │ GHL API
+        ▼
+[GoHighLevel]
+   • Workflows triggados por tags fazem o resto:
+     - emails (templates)
+     - waits (timing)
+     - condicionais (já comprou? pagou?)
+     - WhatsApp Business (quando ativar)
+     - SMS, pipelines, ...
+```
 
-- Lógica trancada em JSON gigante, impossível revisar em PR
-- Custo escala com execução, não com valor entregue
-- Manutenção exige instância 24/7 + re-config quando muda de servidor
-- Versionamento de prompts e regras: inexistente
-- Migração entre plataformas (Kiwify → Hotmart): refazer tudo
+**O que tu monta na UI do GHL** (uma vez): 6 workflows usando templates do diretório `docs/workflows/`.
+**O que tu deploya** (uma vez): 1 Cloudflare Worker via `wrangler deploy`.
+**O que custa**: $0 no Cloudflare (free tier 100k req/dia), $0 extra no GHL (tu já paga).
 
-Este repo porta os fluxos mais comuns pra **Python + FastAPI + Postgres**, com **adapters plug-and-play** pra qualquer plataforma de pagamento. Roda em VPS, Railway, Fly, ou local.
+## Por quê
 
----
+- **n8n** = JSON gigante, lock-in, manutenção 24/7.
+- **Tudo no GHL native** = inseguro (não valida HMAC) + difícil debugar.
+- **Híbrido (este repo)** = valida segurança no Worker, lógica de negócio no GHL UI. Manutenção mínima.
 
 ## Plataformas suportadas
 
-Built-in (adapters prontos + testes verde):
+| Plataforma | Slug | Validação | Eventos |
+|------------|------|-----------|---------|
+| Kiwify | `kiwify` | HMAC-SHA1 query | pix, boleto, compra_aprovada, recusada, carrinho, ... |
+| Hotmart | `hotmart` | Hottok header | PURCHASE_APPROVED/BILLET/REFUSED/... |
+| Shopify | `shopify` | HMAC-SHA256 base64 | orders/paid, checkouts/create, ... |
+| Lastlink | `lastlink` | HMAC-SHA256 hex | Purchase_Order_Confirmed, Purchase_Request_Confirmed, ... |
 
-| Plataforma | Slug | Validação |
-|------------|------|-----------|
-| Kiwify | `kiwify` | HMAC-SHA1 query string |
-| Hotmart | `hotmart` | Hottok (token estático) |
-| Shopify | `shopify` | HMAC-SHA256 base64 header |
-| Lastlink | `lastlink` | HMAC-SHA256 hex header |
+Adicionar plataforma nova = ~80 linhas de TypeScript (ver `worker/src/adapters/`).
 
-Eduzz, Kirvano, Pepper, Cademí, Cademi Pay, etc: adicionar custa **~30 linhas** (config-driven via `GenericAdapter`) ou **~50 linhas** (adapter Python custom). Ver [docs/adicionar-plataforma.md](docs/adicionar-plataforma.md).
-
----
-
-## O que vem pronto
-
-### Template 1: `cron-recovery-vencidos`
-
-Cron horário em Python que:
-1. Busca `eventos_pagamento` com pix/boleto vencido
-2. Filtra leads que **não compraram**, **não estão em atendimento humano** e **não foram processados**
-3. Gera mensagem WhatsApp via LLM (OpenAI ou Anthropic)
-4. Envia via WhatsApp (driver pluggable: AvisaAPI, Evolution, Z-API)
-5. Registra `follow_up` pra idempotência
-
-### Template 2: `payment-webhooks`
-
-FastAPI server com endpoint único `POST /webhook/{platform}` que:
-1. Valida assinatura específica da plataforma
-2. Normaliza payload → `NormalizedEvent` schema unificado
-3. Persiste em `eventos_pagamento`
-4. Roteia por kind de evento (pix/boleto/compra_aprovada/recusada/carrinho/onboarding)
-5. Dispara recovery em background (mensagem WhatsApp + email após X minutos)
-
----
-
-## Quickstart (5 minutos)
+## Quickstart
 
 ```bash
 git clone https://github.com/gestordeaudiencia/automacoes-claude
-cd automacoes-claude
-cp .env.example .env       # preencha as chaves
-uv sync
-psql $DATABASE_URL -f shared/schema.sql
+cd automacoes-claude/worker
+npm install
 
-# Webhook server (em um terminal)
-cd templates/payment-webhooks
-uvicorn app:app --reload --port 8000
+# 1. Configurar secrets (Cloudflare gerencia)
+wrangler login
+wrangler secret put GHL_API_KEY            # Private Integration token
+wrangler secret put KIWIFY_WEBHOOK_SECRET  # token HMAC do painel Kiwify
+# ... outras plataformas conforme uso
 
-# Cron de recovery (em outro terminal)
-cd templates/cron-recovery-vencidos
-python app.py --schedule
+# 2. Editar wrangler.toml
+# [vars]
+# GHL_LOCATION_ID = "abc123..."
+
+# 3. Deploy
+npm run deploy
+# → https://automacoes-claude.SEU.workers.dev
 ```
 
-URLs ativas:
-- `POST http://localhost:8000/webhook/kiwify`
-- `POST http://localhost:8000/webhook/hotmart`
-- `POST http://localhost:8000/webhook/shopify`
-- `POST http://localhost:8000/webhook/lastlink`
+## Setup completo
 
----
+Passo-a-passo: [docs/ghl-setup.md](docs/ghl-setup.md)
+
+Workflows GHL pré-prontos (copia da doc, cola na UI):
+- [PIX gerado](docs/workflows/pix-gerado.md)
+- [Boleto gerado](docs/workflows/boleto-gerado.md)
+- [Compra recusada](docs/workflows/compra-recusada.md)
+- [Carrinho abandonado](docs/workflows/carrinho-abandonado.md)
+- [Onboarding](docs/workflows/onboarding.md)
+- [Recovery vencidos](docs/workflows/recovery-vencidos.md)
 
 ## Estrutura
 
 ```
-packages/core/
-  platforms/        ← adapters por plataforma + interface comum
-    base.py         ← NormalizedEvent + PlatformAdapter Protocol
-    kiwify.py / hotmart.py / shopify.py / lastlink.py
-    generic.py      ← config-driven, sem código novo
-    registry.py     ← get_adapter, register_adapter, list_platforms
-  config.py         ← settings via .env (pydantic-settings)
-  db.py             ← asyncpg helpers
-  llm.py            ← OpenAI / Anthropic
-  whatsapp.py       ← drivers AvisaAPI / Evolution / Z-API
+worker/                          ← Cloudflare Worker (TypeScript)
+  src/
+    index.ts                     ← entry, roteia /webhook/{platform}
+    adapters/                    ← 1 arquivo por plataforma
+      kiwify.ts / hotmart.ts / shopify.ts / lastlink.ts
+      index.ts                   ← registry
+    crypto.ts                    ← HMAC helpers (WebCrypto)
+    ghl.ts                       ← cliente GHL API
+    types.ts                     ← NormalizedEvent, helpers
+    __tests__/adapters.test.ts   ← 19 tests
+  wrangler.toml
+  package.json
 
-templates/
-  cron-recovery-vencidos/    ← cron horário, agnóstico de plataforma
-  payment-webhooks/          ← endpoint /webhook/{platform}, multi-plataforma
+docs/                            ← passo-a-passo GHL + workflows
+  ghl-setup.md
+  workflows/
 
-shared/schema.sql            ← Postgres tables (eventos_pagamento + ...)
-docs/                        ← deploy, migrar do n8n, adicionar plataforma
-tests/                       ← 16 smoke tests verde
+reference/python/                ← versão Python anterior, mantida como educacional
 ```
 
-## Stack
+## Migrar do n8n
 
-- Python 3.11+
-- FastAPI + Uvicorn (webhooks)
-- APScheduler (cron in-process)
-- asyncpg (Postgres async)
-- OpenAI / Anthropic SDK (LLM)
-- httpx (HTTP client)
-- pydantic-settings (.env loader)
-- loguru (logs)
-
----
-
-## Docs
-
-- [docs/migrar-do-n8n.md](docs/migrar-do-n8n.md) — passo-a-passo pra portar workflows do n8n
-- [docs/adicionar-plataforma.md](docs/adicionar-plataforma.md) — como suportar Eduzz/Kirvano/qualquer plataforma nova
-- [docs/deploy-railway.md](docs/deploy-railway.md) — deploy em Railway (~$10/mês)
-- [docs/deploy-vps.md](docs/deploy-vps.md) — deploy em VPS Ubuntu
-
----
+[docs/migrar-do-n8n.md (na pasta reference)](reference/python/migrar-do-n8n.md)
 
 ## Quem mantém
 
-Toolkit construído por [Daniel Feitosa](https://instagram.com/gestordeaudiencia) ([@gestordeaudiencia](https://instagram.com/gestordeaudiencia)) e a comunidade [Cloud Coding Brasil](https://cloudcoding.com.br) — educação sobre Claude Code em PT-BR.
-
-Encontrou bug? Quer adicionar plataforma nova? PRs e issues bem-vindas.
-
----
+[Daniel Feitosa](https://instagram.com/gestordeaudiencia) ([@gestordeaudiencia](https://instagram.com/gestordeaudiencia)) — [Cloud Coding Brasil](https://cloudcoding.com.br).
 
 ## Licença
 
-MIT — usa, modifica, distribui, ganha dinheiro com isso. Sem warranty.
+MIT.

@@ -1,0 +1,17 @@
+name = "automacoes-claude"
+main = "src/index.ts"
+compatibility_date = "2026-05-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Configurar via:
+#   wrangler secret put KIWIFY_WEBHOOK_SECRET
+#   wrangler secret put HOTMART_WEBHOOK_SECRET
+#   wrangler secret put SHOPIFY_WEBHOOK_SECRET
+#   wrangler secret put LASTLINK_WEBHOOK_SECRET
+#   wrangler secret put GHL_API_KEY
+#
+# Variáveis públicas (não-sensíveis) ficam aqui:
+[vars]
+GHL_LOCATION_ID = ""
+GHL_BASE_URL = "https://services.leadconnectorhq.com"
+LOG_LEVEL = "info"

@@ -1,3 +1,4 @@
+# Python (reference/)
 __pycache__/
 *.py[cod]
 *$py.class
@@ -16,9 +17,17 @@ build/
 .ruff_cache/
 .mypy_cache/
 .coverage
-htmlcov/
+
+# Node / TypeScript / Cloudflare
+node_modules/
+.wrangler/
+*.tgz
+.npm/
+.eslintcache
+
+# Misc
 .DS_Store
 .idea/
 .vscode/
-node_modules/
 *.log
+.code-review-graph/
