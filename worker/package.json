@@ -10,6 +10,7 @@
     "deploy": "wrangler deploy",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:webhook": "bash scripts/test-webhook.sh",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {

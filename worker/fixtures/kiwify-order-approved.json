@@ -1,0 +1,21 @@
+{
+  "order_id": "9d88f4a2-test",
+  "order_status": "paid",
+  "payment_method": "credit_card",
+  "webhook_event_type": "order_approved",
+  "Customer": {
+    "first_name": "João",
+    "full_name": "João da Silva",
+    "email": "joao.test@example.com",
+    "mobile": "11987654321"
+  },
+  "Product": {
+    "product_id": "prod_test_001",
+    "product_name": "Curso Teste"
+  },
+  "Commissions": {
+    "charge_amount": "197.00",
+    "currency": "BRL"
+  },
+  "access_url": "https://members.kiwify.com/login?club=test"
+}

@@ -1,0 +1,40 @@
+{
+  "id": "evt_hotmart_test_001",
+  "event": "PURCHASE_APPROVED",
+  "version": "2.0.0",
+  "creation_date": 1746720000000,
+  "data": {
+    "buyer": {
+      "name": "Maria Souza",
+      "email": "maria.test@example.com",
+      "checkout_phone": "11999998888",
+      "document": "00000000000"
+    },
+    "purchase": {
+      "transaction": "HP12345678",
+      "order_date": 1746720000000,
+      "approved_date": 1746720100000,
+      "payment": {
+        "type": "CREDIT_CARD",
+        "method": "VISA",
+        "installments_number": 1
+      },
+      "price": {
+        "value": 297.00,
+        "currency_value": "BRL"
+      },
+      "offer": {
+        "code": "OFFERTEST"
+      },
+      "checkout_country": {
+        "name": "Brasil",
+        "iso": "BR"
+      }
+    },
+    "product": {
+      "id": 12345,
+      "ucode": "abc-def-ghi",
+      "name": "Mentoria Teste"
+    }
+  }
+}

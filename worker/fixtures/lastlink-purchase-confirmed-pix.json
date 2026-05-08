@@ -1,0 +1,28 @@
+{
+  "Id": "evt_lastlink_001",
+  "Event": "Purchase_Request_Confirmed",
+  "CreatedAt": "2026-05-08T18:00:00Z",
+  "Data": {
+    "Buyer": {
+      "Name": "Carla Mendes",
+      "Email": "carla.test@example.com",
+      "PhoneNumber": "11966665555",
+      "Document": "00000000000"
+    },
+    "Products": [
+      {
+        "Id": "prod_lastlink_001",
+        "Name": "Curso Premium"
+      }
+    ],
+    "Payment": {
+      "Method": "Pix",
+      "Amount": 497.00,
+      "PixCode": "00020126LASTLINKPIX...",
+      "PixExpirationDate": "2026-05-09T23:59:00Z"
+    },
+    "Offer": {
+      "Url": "https://app.lastlink.com/o/test"
+    }
+  }
+}

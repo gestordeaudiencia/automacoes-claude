@@ -50,6 +50,10 @@
 
 Adicionar plataforma nova = ~80 linhas de TypeScript (ver `worker/src/adapters/`).
 
+## Setup completo
+
+**👉 [SETUP.md](SETUP.md)** — checklist passo-a-passo (45-60 min) do que precisa pra rodar em produção.
+
 ## Quickstart
 
 ```bash

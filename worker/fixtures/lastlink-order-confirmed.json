@@ -1,0 +1,22 @@
+{
+  "Id": "evt_lastlink_002",
+  "Event": "Purchase_Order_Confirmed",
+  "CreatedAt": "2026-05-08T18:05:00Z",
+  "Data": {
+    "Buyer": {
+      "Name": "Carla Mendes",
+      "Email": "carla.test@example.com",
+      "PhoneNumber": "11966665555"
+    },
+    "Products": [
+      {
+        "Id": "prod_lastlink_001",
+        "Name": "Curso Premium"
+      }
+    ],
+    "Payment": {
+      "Method": "CreditCard",
+      "Amount": 497.00
+    }
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "id": "evt_hotmart_pix_001",
+  "event": "PURCHASE_BILLET_PRINTED",
+  "version": "2.0.0",
+  "data": {
+    "buyer": {
+      "name": "Pedro Lima",
+      "email": "pedro.test@example.com",
+      "checkout_phone": "21988887777"
+    },
+    "purchase": {
+      "transaction": "HP_PIX_001",
+      "payment": {
+        "type": "PIX",
+        "pix_code": "00020126HOTMARTPIX...",
+        "pix_expiration_date": "2026-05-09T23:59:00Z"
+      },
+      "price": {
+        "value": 497.00,
+        "currency_value": "BRL"
+      }
+    },
+    "product": {
+      "id": 12345,
+      "name": "Curso Pro"
+    }
+  }
+}

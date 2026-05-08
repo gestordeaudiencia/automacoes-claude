@@ -1,0 +1,22 @@
+{
+  "order_id": "9d88f4a2-test",
+  "order_status": "waiting_payment",
+  "payment_method": "pix",
+  "webhook_event_type": "pix_created",
+  "Customer": {
+    "first_name": "João",
+    "full_name": "João da Silva",
+    "email": "joao.test@example.com",
+    "mobile": "11987654321"
+  },
+  "Product": {
+    "product_id": "prod_test_001",
+    "product_name": "Curso Teste"
+  },
+  "Commissions": {
+    "charge_amount": "197.00",
+    "currency": "BRL"
+  },
+  "pix_code": "00020126360014BR.GOV.BCB.PIX0114+5511987654321520400005303986540519.005802BR5925RECEBEDOR TESTE6009SAO PAULO62070503***6304ABCD",
+  "pix_expiration": "2026-05-09 15:00:00"
+}
