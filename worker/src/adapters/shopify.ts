@@ -46,6 +46,7 @@ export const ShopifyAdapter: PlatformAdapter = {
       platform: "shopify",
       eventKind: mapKind(payload),
       rawEventType: payload._topic || "",
+      isTest: Boolean(payload.test),
       customer: {
         name: fullName,
         firstName: firstNameOf(fullName),

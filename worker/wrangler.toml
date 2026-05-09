@@ -10,8 +10,8 @@ compatibility_flags = ["nodejs_compat"]
 #   wrangler secret put LASTLINK_WEBHOOK_SECRET
 #   wrangler secret put GHL_API_KEY
 #
-# Variáveis públicas (não-sensíveis) ficam aqui:
+# Variáveis públicas (não-sensíveis) ficam aqui.
+# GHL_LOCATION_ID e GHL_API_KEY são secrets (wrangler secret put).
 [vars]
-GHL_LOCATION_ID = ""
 GHL_BASE_URL = "https://services.leadconnectorhq.com"
 LOG_LEVEL = "info"

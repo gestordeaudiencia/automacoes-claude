@@ -1,28 +1,56 @@
 {
-  "Id": "evt_lastlink_001",
+  "Id": "4c01069e-f815-4149-8fb1-b8000159550c",
+  "IsTest": true,
   "Event": "Purchase_Request_Confirmed",
-  "CreatedAt": "2026-05-08T18:00:00Z",
+  "CreatedAt": "2026-05-09T23:47:51",
   "Data": {
-    "Buyer": {
-      "Name": "Carla Mendes",
-      "Email": "carla.test@example.com",
-      "PhoneNumber": "11966665555",
-      "Document": "00000000000"
-    },
     "Products": [
-      {
-        "Id": "prod_lastlink_001",
-        "Name": "Curso Premium"
-      }
+      { "Id": "0dbde5c2-83c3-4fa8-8c52-1b4c821f5e43", "Name": "Curso Teste" }
     ],
-    "Payment": {
-      "Method": "Pix",
-      "Amount": 497.00,
-      "PixCode": "00020126LASTLINKPIX...",
-      "PixExpirationDate": "2026-05-09T23:59:00Z"
+    "Buyer": {
+      "Id": "buyer-test-001",
+      "Email": "buyer.test@example.com",
+      "Name": "João da Silva",
+      "PhoneNumber": "+5511987654321",
+      "Document": "000.000.000-00",
+      "Address": {
+        "ZipCode": "01000-000",
+        "Street": "Rua Teste",
+        "StreetNumber": "100",
+        "Complement": "Apto 1",
+        "District": "Centro",
+        "City": "São Paulo",
+        "State": "SP"
+      }
+    },
+    "Seller": { "Id": "seller-001", "Email": "seller@example.com" },
+    "Commissions": [{ "Value": 197.0, "Source": "PRODUCER" }],
+    "Purchase": {
+      "Recurrency": 1,
+      "OriginalPrice": { "Value": 197.00 },
+      "Price": { "Value": 197.00 },
+      "Payment": { "NumberOfInstallments": 1, "PaymentMethod": "pix" },
+      "Pix": {
+        "QrCode": "https://pix.example.com/qrcode",
+        "QrCodeText": "00020126LASTLINKPIX..."
+      },
+      "InvoiceUrl": "https://invoices.lastlink.com/test-invoice",
+      "OriginUrl": "https://lastlink.com/p/AAAAA/checkout?utm_source=ig&utm_medium=stories"
     },
     "Offer": {
-      "Url": "https://app.lastlink.com/o/test"
+      "Id": "offer-001",
+      "Name": "Oferta padrão",
+      "Url": "https://lastlink.com/p/AAAAA"
+    },
+    "Utm": {
+      "UtmSource": "ig",
+      "UtmMedium": "stories",
+      "UtmCampaign": "lancamento-2026",
+      "UtmTerm": "",
+      "UtmContent": "",
+      "Src": "blog",
+      "Sck": "form_button",
+      "Vtid": "00001-000002-000102"
     }
   }
 }

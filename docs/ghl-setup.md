@@ -4,120 +4,153 @@ Configurar a Location do GHL pra receber eventos do Worker e disparar workflows.
 
 ## 1. Coletar credenciais
 
-Você precisa de **dois valores**:
-
 ### `GHL_LOCATION_ID`
 
-GHL → menu lateral → ⚙️ Settings → **Business Profile** → topo da página, Location Id (ex: `abc123XYZ...`).
+GHL → ⚙️ Settings → **Business Profile** → topo da página, Location Id.
 
 ### `GHL_API_KEY` (Private Integration token)
-
-Recomendado usar **Private Integration** (não a API key legacy):
 
 1. GHL → ⚙️ Settings → **Private Integrations**
 2. Clique **+ Create New Integration**
 3. Nome: `automacoes-claude-worker`
 4. Scopes mínimos:
-   - `contacts.write` (upsert contato)
+   - `contacts.write`
    - `contacts.readonly`
-   - `workflows.readonly` (se for triggar workflow via API)
-5. Copia o token gerado — começa com `pit-...`. **Salva agora**, GHL não mostra de novo.
+5. Copia o token gerado (`pit-...`). **Salva agora**, GHL não mostra de novo.
 
-## 2. Criar custom fields na Location
+## 2. Custom Fields
 
-O Worker grava dados do evento em custom fields. Crie na UI antes:
+Crie em GHL → ⚙️ Settings → **Custom Fields** → tab **Contact** → **+ Add Field**.
 
-GHL → ⚙️ Settings → **Custom Fields** → tab **Contact** → **+ Add Field** pra cada um abaixo:
+**Lista validada contra payloads reais Lastlink** (camadas: plataforma, produto, pagamento, cliente, tracking, assinatura).
 
-| Field name | Field key (auto) | Type |
-|------------|------------------|------|
-| Plataforma origem | `plataforma_origem` | Single line |
-| Evento recente | `evento_recente` | Single line |
-| Produto nome | `produto_nome` | Single line |
-| Produto ID | `produto_id` | Single line |
-| Valor BRL | `valor_brl` | Single line |
-| PIX code | `pix_code` | Multi-line text |
-| PIX expiration | `pix_expiration` | Single line |
-| Boleto URL | `boleto_url` | Single line |
-| Boleto barcode | `boleto_barcode` | Multi-line text |
-| Boleto expiry | `boleto_expiry` | Single line |
-| Access URL | `access_url` | Single line |
-| Rejection reason | `rejection_reason` | Single line |
+### Plataforma + evento
 
-**Importante:** o `Field key` precisa bater **exatamente** com o que o Worker manda (case-insensitive). GHL gera automaticamente baseado no nome — confirma os keys.
+| Field name (label) | Type | Field key esperado |
+|---|---|---|
+| Plataforma origem | Single Line | `plataforma_origem` |
+| Evento recente | Single Line | `evento_recente` |
+| Raw event type | Single Line | `raw_event_type` |
 
-## 3. Tags que o Worker adiciona
+### Produto
 
-Pra cada evento, o Worker adiciona automaticamente:
+| Field name | Type | Key |
+|---|---|---|
+| Produto nome | Single Line | `produto_nome` |
+| Produto ID | Single Line | `produto_id` |
+| Valor BRL | Single Line | `valor_brl` |
 
-- `platform:kiwify` (ou `hotmart`/`shopify`/`lastlink`)
-- `ev:pix` (ou `boleto`/`compra_aprovada`/`recusada`/`carrinho`/`cancelada`)
-- `produto:<slug-do-nome>` (ex: `produto:investidor-coeso`)
-- `pgto:credit_card` (se método disponível)
+### Pagamento — PIX
 
-**Esses tags trigam os workflows.** Você não precisa criar tags manualmente — o Worker cria sob demanda.
+| Field name | Type | Key |
+|---|---|---|
+| PIX code | Multi Line | `pix_code` |
+| PIX QR URL | Single Line | `pix_qr_url` |
+| PIX expiration | Single Line | `pix_expiration` |
 
-## 4. Deploy do Worker
+### Pagamento — Boleto
 
-```bash
-cd worker
-npm install
-wrangler login                                    # autentica no Cloudflare
-wrangler secret put KIWIFY_WEBHOOK_SECRET         # cola token Kiwify
-wrangler secret put HOTMART_WEBHOOK_SECRET        # cola Hottok
-wrangler secret put SHOPIFY_WEBHOOK_SECRET        # cola API secret Shopify
-wrangler secret put LASTLINK_WEBHOOK_SECRET       # cola signing secret Lastlink
-wrangler secret put GHL_API_KEY                   # cola pit-... do passo 1
-```
+| Field name | Type | Key |
+|---|---|---|
+| Boleto URL | Single Line | `boleto_url` |
+| Boleto barcode (linha digitável) | Multi Line | `boleto_barcode` |
+| Boleto expiry | Single Line | `boleto_expiry` |
 
-Edita `worker/wrangler.toml`:
+### Pagamento — geral
 
-```toml
-[vars]
-GHL_LOCATION_ID = "abc123..."   # do passo 1
-```
+| Field name | Type | Key |
+|---|---|---|
+| Invoice URL | Single Line | `invoice_url` |
+| Access URL | Single Line | `access_url` |
+| Payment method | Single Line | `payment_method` |
+| Rejection reason | Single Line | `rejection_reason` |
 
-Deploy:
+### Cliente
 
-```bash
-npm run deploy
-```
+| Field name | Type | Key |
+|---|---|---|
+| Documento | Single Line | `documento` |
 
-Cloudflare retorna URL: `https://automacoes-claude.SEU_USUARIO.workers.dev`.
+(Endereço completo é gravado nos campos nativos do GHL — `address1`, `city`, `state`, `postalCode` — não precisa criar custom.)
 
-Test:
+### Tracking / atribuição (UTMs + afiliado)
 
-```bash
-curl https://automacoes-claude.SEU_USUARIO.workers.dev/health
-# {"ok":true,"platforms":["hotmart","kiwify","lastlink","shopify"]}
-```
+| Field name | Type | Key |
+|---|---|---|
+| UTM source | Single Line | `utm_source` |
+| UTM medium | Single Line | `utm_medium` |
+| UTM campaign | Single Line | `utm_campaign` |
+| UTM term | Single Line | `utm_term` |
+| UTM content | Single Line | `utm_content` |
+| Affiliate ID | Single Line | `affiliate_id` |
+| Affiliate email | Single Line | `affiliate_email` |
 
-## 5. Cadastrar URL nas plataformas
+### Assinatura (se vendes recorrente)
 
-Pra cada plataforma que você usa, cadastre a URL `/webhook/{platform}`:
+| Field name | Type | Key |
+|---|---|---|
+| Subscription ID | Single Line | `subscription_id` |
+| Subscription recurrency | Single Line | `subscription_recurrency` |
+
+**Total: 23 custom fields.** Cria todos pra cobrir todo payload.
+
+**Importante:** o `Field key` é gerado automático pelo GHL baseado no nome. Confirma após criar que ficou em snake_case exatamente como a coluna "Key" acima. Se algum sair diferente (ex: `plataformaorigem` sem underscore), me avisa que ajusto Worker.
+
+## 3. Deploy do Worker
+
+Já feito! URL: `https://automacoes-claude.gestordeaudiencia.workers.dev`
+
+## 4. Cadastrar URL nas plataformas
+
+URL pra cada plataforma:
 
 | Plataforma | URL |
-|------------|-----|
-| Kiwify | `https://automacoes-claude.SEU.workers.dev/webhook/kiwify` |
-| Hotmart | `https://automacoes-claude.SEU.workers.dev/webhook/hotmart` |
-| Shopify | `https://automacoes-claude.SEU.workers.dev/webhook/shopify` |
-| Lastlink | `https://automacoes-claude.SEU.workers.dev/webhook/lastlink` |
+|---|---|
+| Kiwify | `https://automacoes-claude.gestordeaudiencia.workers.dev/webhook/kiwify` |
+| Hotmart | `https://automacoes-claude.gestordeaudiencia.workers.dev/webhook/hotmart` |
+| Shopify | `https://automacoes-claude.gestordeaudiencia.workers.dev/webhook/shopify` |
+| Lastlink | `https://automacoes-claude.gestordeaudiencia.workers.dev/webhook/lastlink` |
 
-Em cada painel:
-- **Kiwify**: Configurações → Webhooks → cole URL + escolha eventos (pix_created, billet_created, order_approved, order_refused, abandoned_cart) + copie token HMAC pra `KIWIFY_WEBHOOK_SECRET`
-- **Hotmart**: App de Postback → cole URL + escolha eventos PURCHASE_* + copie Hottok pra `HOTMART_WEBHOOK_SECRET`
-- **Shopify**: Settings → Notifications → Webhooks → cole URL pra cada evento (orders/paid, orders/cancelled, checkouts/create) + copie API secret pra `SHOPIFY_WEBHOOK_SECRET`
-- **Lastlink**: Configurações → Integrações → Webhooks → cole URL + copie signing secret pra `LASTLINK_WEBHOOK_SECRET`
+### Lastlink — eventos recomendados
 
-## 6. Montar workflows GHL
+Marca estes (cobertos pelo adapter):
 
-Pronto pra montar os workflows. Cada cenário tem doc própria em `docs/workflows/`:
+✅ **Compra Completa** (`Purchase_Order_Confirmed`) → onboarding
+✅ **Fatura Criada** (`Purchase_Request_Confirmed`) → confirmação pix/boleto
+✅ **Carrinho Abandonado** (`Abandoned_Cart`) → mensagem consultiva
+✅ **Pedido de Compra Expirada** (`Purchase_Request_Expired`) → recovery pix/boleto vencido
+✅ **Pedido de Compra Cancelado** (`Purchase_Request_Canceled`) → cancelamento
+✅ **Pagamento Estornado** / **Reembolsado** (`Payment_Refund`) → cancelamento
+✅ **Pagamento de Renovação Pendente** (`Subscription_Renewal_Pending`) → recovery renovação
+✅ **Pagamento de Renovação Efetuado** (`Subscription_Renewal_Approved`) → renovação confirmada
+✅ **Assinatura Cancelada** (`Subscription_Canceled`) → churn
 
-- [pix-gerado.md](workflows/pix-gerado.md) — confirma PIX + manda código + lembra perto do vencimento
-- [boleto-gerado.md](workflows/boleto-gerado.md) — confirma boleto + link/barcode
-- [compra-recusada.md](workflows/compra-recusada.md) — empático + tenta outro método
-- [carrinho-abandonado.md](workflows/carrinho-abandonado.md) — consultivo, sem pressão
-- [onboarding.md](workflows/onboarding.md) — boas-vindas + acesso
-- [recovery-vencidos.md](workflows/recovery-vencidos.md) — pix/boleto que venceu sem pagamento
+Opcionais (caso queira workflows custom via tag `ev:outro` + `raw_event_type`):
 
-Cada uma tem o **trigger** (qual tag dispara), os **steps** (quais ações), e o **template de email**.
+- **Periodo de Reembolso Terminado** (`Refund_Period_Over`) — útil pra tag "venda firmada"
+- **Liberação/remoção de acesso** — info-only
+
+## 5. Tags geradas pelo Worker
+
+Pra cada evento, Worker adiciona tags no contato GHL:
+
+```
+platform:lastlink              ← qual plataforma
+ev:pix                         ← kind interno (pix|boleto|compra_aprovada|recusada|carrinho|cancelada|renovacao|outro)
+produto:claude-code-do-zero-ao-avancado  ← slug do produto
+pgto:pix                       ← método de pagamento
+source:test                    ← se IsTest=true
+utm:instagram                  ← UTM source (slugged)
+```
+
+**Use estas tags como triggers dos teus workflows GHL.**
+
+## 6. Workflows GHL
+
+Templates prontos em `docs/workflows/`:
+- [pix-gerado.md](workflows/pix-gerado.md)
+- [boleto-gerado.md](workflows/boleto-gerado.md)
+- [compra-recusada.md](workflows/compra-recusada.md)
+- [carrinho-abandonado.md](workflows/carrinho-abandonado.md)
+- [onboarding.md](workflows/onboarding.md)
+- [recovery-vencidos.md](workflows/recovery-vencidos.md)

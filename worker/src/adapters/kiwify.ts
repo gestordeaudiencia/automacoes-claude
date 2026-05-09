@@ -38,6 +38,7 @@ export const KiwifyAdapter: PlatformAdapter = {
       platform: "kiwify",
       eventKind: mapKind(payload.webhook_event_type || ""),
       rawEventType: payload.webhook_event_type || "",
+      isTest: Boolean(payload.is_test || payload.test),
       customer: {
         name: fullName,
         firstName: firstNameOf(fullName),

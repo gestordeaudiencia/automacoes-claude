@@ -1,0 +1,72 @@
+{
+  "Id": "4c01069e-f815-4149-8fb1-b8000159550c",
+  "IsTest": true,
+  "Event": "Subscription_Renewal_Pending",
+  "CreatedAt": "2026-05-09T23:47:51",
+  "Data": {
+    "Products": [
+      { "Id": "0dbde5c2-83c3-4fa8-8c52-1b4c821f5e43", "Name": "Claude Code do zero ao avançado" }
+    ],
+    "Buyer": {
+      "Id": "5c42aec4-9b47-44eb-8415-9226ed823270",
+      "Email": "test.email@mail.com",
+      "Name": "Moises Pereira",
+      "PhoneNumber": "+5500987645312",
+      "Document": "663.614.400-95",
+      "Address": {
+        "ZipCode": "15056-131",
+        "Street": "Rua Mariana Pereira Butinhon",
+        "StreetNumber": "1",
+        "Complement": "Complemento",
+        "District": "Village Damha Rio Preto III",
+        "City": "São Paulo",
+        "State": "São Paulo"
+      }
+    },
+    "Seller": {
+      "Id": "90925407-66b7-423a-b5a4-53da9021a94e",
+      "Email": "danielfeedbacks@gmail.com"
+    },
+    "Commissions": [
+      { "Value": 0.99, "Source": "MARKETPLACE" },
+      { "Value": 15.25, "Source": "PRODUCER" }
+    ],
+    "Purchase": {
+      "Recurrency": 1,
+      "OriginalPrice": { "Value": 12.5 },
+      "Price": { "Value": 12.5 },
+      "Payment": { "NumberOfInstallments": 1, "PaymentMethod": "pix" },
+      "Affiliate": {
+        "Id": "773a8eb6-c9dc-46c2-8f29-26a6c98383f8",
+        "Email": "test.affiliate@mail.com"
+      },
+      "Pix": {
+        "QrCode": "https://pix.com.br/qrcode",
+        "QrCodeText": "12341234134134234@qweruiy1234231@lastlink.com"
+      },
+      "InvoiceUrl": "https://invoices.lastlink.com/00000000-0000-0000-0000-000000000000-test",
+      "OriginUrl": "https://lastlink.com/p/AAAAAAAAA/checkout-payment?utm_source=abcd&utm_medium=efgh&src=blog&sck=form_button&vtid=00001-000002-000102"
+    },
+    "Subscriptions": [
+      {
+        "Id": "89db642c-37b9-42f1-99d0-02b6ba293be0",
+        "ProductId": "0dbde5c2-83c3-4fa8-8c52-1b4c821f5e43"
+      }
+    ],
+    "Offer": {
+      "Id": "39f65c1f-1950-4177-8e8a-69620509610b",
+      "Name": "Oferta padrão",
+      "Url": "https://lastlink.com/p/CB7B75824"
+    },
+    "Utm": {
+      "UtmSource": "utm_source",
+      "UtmMedium": "utm_medium",
+      "UtmCampaign": "utm_campaign",
+      "UtmTerm": "utm_term",
+      "UtmContent": "utm_content",
+      "Src": "blog",
+      "Sck": "form_button",
+      "Vtid": "00001-000002-000102"
+    }
+  }
+}

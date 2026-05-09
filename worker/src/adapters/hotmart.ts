@@ -31,6 +31,7 @@ export const HotmartAdapter: PlatformAdapter = {
       platform: "hotmart",
       eventKind: mapKind(payload.event || "", payment.type || ""),
       rawEventType: payload.event || "",
+      isTest: false,
       customer: {
         name: fullName,
         firstName: firstNameOf(fullName),

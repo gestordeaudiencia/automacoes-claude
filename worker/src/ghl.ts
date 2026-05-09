@@ -1,15 +1,11 @@
 /**
  * Cliente mínimo da API GHL (LeadConnector).
  *
- * Docs: https://highlevel.stoplight.io/docs/integrations/
+ * Pra cada evento normalizado:
+ *   1. upsertContact   → cria/atualiza contato (email/phone/name) + custom fields
+ *   2. addTags         → tags trigam workflows GHL
  *
- * Estratégia: pra cada evento normalizado, fazemos:
- *   1. upsertContact   → cria/atualiza contato com email/phone/name + custom fields
- *   2. addTags         → tag indica o tipo de evento (ex: "ev:pix", "produto:investidor")
- *   3. (opcional) addContactToWorkflow → dispara workflow GHL pré-montado
- *
- * Workflows ficam montados na UI GHL — eles cuidam de waits, mensagens, condicionais.
- * Aqui só populamos os dados certos.
+ * Workflows ficam montados na UI GHL.
  */
 
 import type { NormalizedEvent } from "./types";
@@ -44,7 +40,8 @@ async function ghlFetch(env: GhlEnv, path: string, init: RequestInit = {}): Prom
 }
 
 export async function upsertContact(env: GhlEnv, ev: NormalizedEvent): Promise<GhlContact> {
-  const body = {
+  const addr = ev.customer.address;
+  const body: Record<string, unknown> = {
     locationId: env.GHL_LOCATION_ID,
     firstName: ev.customer.firstName || undefined,
     name: ev.customer.name || undefined,
@@ -53,6 +50,13 @@ export async function upsertContact(env: GhlEnv, ev: NormalizedEvent): Promise<G
     source: ev.platform,
     customFields: buildCustomFields(ev),
   };
+  if (addr) {
+    body.address1 = [addr.street, addr.streetNumber, addr.complement].filter(Boolean).join(", ");
+    body.city = addr.city;
+    body.state = addr.state;
+    body.postalCode = addr.zipCode;
+    body.country = addr.country || "BR";
+  }
 
   const res = await ghlFetch(env, "/contacts/upsert", {
     method: "POST",
@@ -96,51 +100,81 @@ export async function addToWorkflow(
   }
 }
 
-/**
- * Tags geradas automaticamente pra cada evento.
- * Workflows GHL são triggados por essas tags (Trigger: "Tag added").
- */
 export function buildTagsFor(ev: NormalizedEvent): string[] {
-  const tags: string[] = [
-    `platform:${ev.platform}`,
-    `ev:${ev.eventKind}`,
-  ];
+  const tags: string[] = [`platform:${ev.platform}`, `ev:${ev.eventKind}`];
   if (ev.product.name) {
-    const slug = ev.product.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 40);
-    tags.push(`produto:${slug}`);
+    const slug = ev.product.name
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "")
+      .replace(/[^a-z0-9]+/g, "-")
+      .slice(0, 40)
+      .replace(/^-|-$/g, "");
+    if (slug) tags.push(`produto:${slug}`);
   }
   if (ev.payment.method) tags.push(`pgto:${ev.payment.method}`);
+  if (ev.isTest) tags.push("source:test");
+  if (ev.tracking?.utmSource) {
+    const utm = ev.tracking.utmSource.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 30);
+    if (utm) tags.push(`utm:${utm}`);
+  }
   return tags;
 }
 
 function buildCustomFields(ev: NormalizedEvent): Array<{ key: string; field_value: string }> {
   // Os keys precisam corresponder aos custom fields cadastrados na location GHL.
-  // Cliente cria estes campos uma vez na UI GHL antes de usar.
-  // Adicione/remova conforme tua location.
+  // Snake_case é o que GHL gera por padrão a partir do nome do campo.
   const fields: Array<{ key: string; field_value: string }> = [];
-  const push = (key: string, val: string | undefined) => {
-    if (val) fields.push({ key, field_value: val });
+  const push = (key: string, val: string | number | undefined | null) => {
+    if (val === undefined || val === null || val === "") return;
+    fields.push({ key, field_value: String(val) });
   };
 
+  // Plataforma + evento
   push("plataforma_origem", ev.platform);
   push("evento_recente", ev.eventKind);
+  push("raw_event_type", ev.rawEventType);
+
+  // Produto
   push("produto_nome", ev.product.name);
   push("produto_id", ev.product.id);
   push("valor_brl", valueBrl(ev.product.valueCents));
+
+  // Pagamento
   push("pix_code", ev.payment.pixCode);
+  push("pix_qr_url", ev.payment.pixQrUrl);
   push("pix_expiration", ev.payment.pixExpiration);
   push("boleto_url", ev.payment.boletoUrl);
   push("boleto_barcode", ev.payment.boletoBarcode);
   push("boleto_expiry", ev.payment.boletoExpiry);
+  push("invoice_url", ev.payment.invoiceUrl);
   push("access_url", ev.payment.accessUrl);
   push("rejection_reason", ev.payment.rejectionReason);
+  push("payment_method", ev.payment.method);
+
+  // Cliente
+  push("documento", ev.customer.document);
+
+  // Tracking / atribuição
+  if (ev.tracking) {
+    push("utm_source", ev.tracking.utmSource);
+    push("utm_medium", ev.tracking.utmMedium);
+    push("utm_campaign", ev.tracking.utmCampaign);
+    push("utm_term", ev.tracking.utmTerm);
+    push("utm_content", ev.tracking.utmContent);
+    push("affiliate_id", ev.tracking.affiliateId);
+    push("affiliate_email", ev.tracking.affiliateEmail);
+  }
+
+  // Assinatura
+  if (ev.subscription) {
+    push("subscription_id", ev.subscription.id);
+    push("subscription_recurrency", ev.subscription.recurrency);
+  }
 
   return fields;
 }
 
-/**
- * Pipeline completo: upsert + tags + (opcional) workflow.
- */
 export async function dispatchEventToGhl(env: GhlEnv, ev: NormalizedEvent): Promise<{
   contactId: string;
   tags: string[];

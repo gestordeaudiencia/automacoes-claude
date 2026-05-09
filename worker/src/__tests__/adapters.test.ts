@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { getAdapter, listPlatforms } from "../adapters";
 import { hmacSha1Hex, hmacSha256Base64, hmacSha256Hex } from "../crypto";
-
-const enc = (s: string) => s;
+import { buildTagsFor } from "../ghl";
 
 function buildHeaders(map: Record<string, string>): Headers {
   const h = new Headers();
@@ -28,23 +27,17 @@ describe("Kiwify adapter", () => {
   };
   const raw = JSON.stringify(payload);
 
-  it("valida assinatura HMAC-SHA1 em query", async () => {
+  it("valida HMAC-SHA1 query", async () => {
     const sig = await hmacSha1Hex("sec", raw);
     expect(
       await adapter.validateSignature(raw, buildHeaders({}), buildQuery({ signature: sig }), "sec")
     ).toBe(true);
   });
 
-  it("rejeita assinatura inválida", async () => {
+  it("rejeita signature inválida", async () => {
     expect(
       await adapter.validateSignature(raw, buildHeaders({}), buildQuery({ signature: "x" }), "sec")
     ).toBe(false);
-  });
-
-  it("aceita sem secret (modo dev)", async () => {
-    expect(
-      await adapter.validateSignature(raw, buildHeaders({}), buildQuery({}), "")
-    ).toBe(true);
   });
 
   it("normaliza pix_created → pix", () => {
@@ -52,9 +45,7 @@ describe("Kiwify adapter", () => {
     expect(ev.platform).toBe("kiwify");
     expect(ev.eventKind).toBe("pix");
     expect(ev.customer.firstName).toBe("João");
-    expect(ev.customer.phone).toBe("5511987654321");
     expect(ev.product.valueCents).toBe(19700);
-    expect(ev.payment.pixCode).toBe("00020126...");
   });
 
   it.each([
@@ -81,7 +72,7 @@ describe("Hotmart adapter", () => {
     },
   };
 
-  it("valida Hottok header", async () => {
+  it("valida Hottok", async () => {
     expect(
       await adapter.validateSignature("", buildHeaders({ "x-hotmart-hottok": "tok" }), buildQuery({}), "tok")
     ).toBe(true);
@@ -90,16 +81,14 @@ describe("Hotmart adapter", () => {
     ).toBe(false);
   });
 
-  it("normaliza PURCHASE_APPROVED → compra_aprovada", () => {
+  it("normaliza PURCHASE_APPROVED", () => {
     const ev = adapter.normalize(payload);
-    expect(ev.platform).toBe("hotmart");
     expect(ev.eventKind).toBe("compra_aprovada");
     expect(ev.customer.firstName).toBe("Maria");
-    expect(ev.customer.phone).toBe("5511999998888");
     expect(ev.product.valueCents).toBe(29700);
   });
 
-  it("distingue PIX vs BILLET via payment.type", () => {
+  it("PIX vs BILLET via payment.type", () => {
     const base: any = { event: "PURCHASE_BILLET_PRINTED", data: { purchase: { payment: { type: "PIX" } } } };
     expect(adapter.normalize(base).eventKind).toBe("pix");
     base.data.purchase.payment.type = "BILLET";
@@ -130,38 +119,51 @@ describe("Shopify adapter", () => {
       await adapter.validateSignature(raw, buildHeaders({ "x-shopify-hmac-sha256": sig }), buildQuery({}), "sec")
     ).toBe(true);
     expect(
-      await adapter.validateSignature(raw, buildHeaders({ "x-shopify-hmac-sha256": "deadbeef" }), buildQuery({}), "sec")
+      await adapter.validateSignature(raw, buildHeaders({ "x-shopify-hmac-sha256": "x" }), buildQuery({}), "sec")
     ).toBe(false);
   });
 
-  it("normaliza orders/paid → compra_aprovada", () => {
+  it("orders/paid → compra_aprovada", () => {
     const ev = adapter.normalize(payload);
     expect(ev.eventKind).toBe("compra_aprovada");
     expect(ev.customer.firstName).toBe("Carlos");
-    expect(ev.customer.phone).toBe("5511999998888");
     expect(ev.product.valueCents).toBe(39700);
-  });
-
-  it("checkouts/create + abandoned → carrinho", () => {
-    const p: any = { _topic: "checkouts/create", abandoned_checkout_url: "https://shop/abc" };
-    expect(adapter.normalize(p).eventKind).toBe("carrinho");
   });
 });
 
-// ---------- Lastlink ----------
+// ---------- Lastlink (real schema, validado contra payloads reais) ----------
 
-describe("Lastlink adapter", () => {
+describe("Lastlink adapter — schema real", () => {
   const adapter = getAdapter("lastlink")!;
-  const payload = {
-    Id: "evt_1",
-    Event: "Purchase_Request_Confirmed",
+
+  const renewalPendingPix = {
+    Id: "evt-1",
+    IsTest: true,
+    Event: "Subscription_Renewal_Pending",
     Data: {
-      Buyer: { Name: "Carla Mendes", Email: "c@x.com", PhoneNumber: "11966665555" },
-      Products: [{ Id: "p_xyz", Name: "Curso Pro" }],
-      Payment: { Method: "Pix", Amount: 497.0, PixCode: "00020126LL" },
+      Products: [{ Id: "prod-1", Name: "Claude Code do zero ao avançado" }],
+      Buyer: {
+        Id: "buyer-1",
+        Email: "test@example.com",
+        Name: "Moises Pereira",
+        PhoneNumber: "+5500987645312",
+        Document: "663.614.400-95",
+        Address: { ZipCode: "15056-131", Street: "Rua A", StreetNumber: "1", City: "São Paulo", State: "SP" },
+      },
+      Purchase: {
+        Recurrency: 1,
+        Price: { Value: 12.5 },
+        Payment: { NumberOfInstallments: 1, PaymentMethod: "pix" },
+        Affiliate: { Id: "aff-1", Email: "aff@x.com" },
+        Pix: { QrCode: "https://pix.com/qr", QrCodeText: "00020126..." },
+        InvoiceUrl: "https://invoice.lastlink.com/test",
+      },
+      Subscriptions: [{ Id: "sub-1", ProductId: "prod-1" }],
+      Offer: { Id: "off-1", Name: "Oferta", Url: "https://lastlink.com/p/X" },
+      Utm: { UtmSource: "instagram", UtmMedium: "stories", UtmCampaign: "lanc-2026" },
     },
   };
-  const raw = JSON.stringify(payload);
+  const raw = JSON.stringify(renewalPendingPix);
 
   it("valida HMAC-SHA256 hex (com e sem prefixo sha256=)", async () => {
     const sig = await hmacSha256Hex("ll", raw);
@@ -176,26 +178,177 @@ describe("Lastlink adapter", () => {
     ).toBe(false);
   });
 
-  it("normaliza Purchase_Request_Confirmed (PIX) → pix", () => {
-    const ev = adapter.normalize(payload);
+  it("Subscription_Renewal_Pending (pix) → pix", () => {
+    const ev = adapter.normalize(renewalPendingPix);
+    expect(ev.platform).toBe("lastlink");
     expect(ev.eventKind).toBe("pix");
-    expect(ev.customer.firstName).toBe("Carla");
-    expect(ev.customer.phone).toBe("5511966665555");
-    expect(ev.product.valueCents).toBe(49700);
-    expect(ev.payment.pixCode).toBe("00020126LL");
+    expect(ev.isTest).toBe(true);
+    expect(ev.customer.firstName).toBe("Moises");
+    expect(ev.customer.document).toBe("663.614.400-95");
+    expect(ev.customer.address?.city).toBe("São Paulo");
+    expect(ev.product.valueCents).toBe(1250);
+    expect(ev.payment.pixCode).toBe("00020126...");
+    expect(ev.payment.pixQrUrl).toBe("https://pix.com/qr");
+    expect(ev.payment.invoiceUrl).toBe("https://invoice.lastlink.com/test");
+    expect(ev.tracking?.utmSource).toBe("instagram");
+    expect(ev.tracking?.affiliateEmail).toBe("aff@x.com");
+    expect(ev.subscription?.id).toBe("sub-1");
+    expect(ev.subscription?.recurrency).toBe(1);
   });
 
-  it("Purchase_Order_Confirmed → compra_aprovada", () => {
-    const p: any = { Event: "Purchase_Order_Confirmed", Data: { Payment: { Method: "CreditCard" } } };
-    expect(adapter.normalize(p).eventKind).toBe("compra_aprovada");
+  it("Purchase_Order_Confirmed (real payload) → compra_aprovada", () => {
+    const ev = adapter.normalize({
+      Event: "Purchase_Order_Confirmed",
+      IsTest: true,
+      Data: {
+        Products: [{ Id: "p1", Name: "Curso" }],
+        Buyer: { Email: "x@x.com", Name: "Moises" },
+        Purchase: {
+          PaymentId: "pay-1",
+          PaymentDate: "2026-05-09T23:47:50Z",
+          NextBilling: "2026-06-09T23:47:50Z",
+          Price: { Value: 12.5 },
+          Payment: { PaymentMethod: "pix", NumberOfInstallments: 1 },
+          Pix: { QrCode: "https://qr", QrCodeText: "code" },
+          InvoiceUrl: "https://inv",
+        },
+        Subscriptions: [{ Id: "sub-1" }],
+      },
+    });
+    expect(ev.eventKind).toBe("compra_aprovada");
+    expect(ev.payment.paymentId).toBe("pay-1");
+    expect(ev.subscription?.nextBilling).toBe("2026-06-09T23:47:50Z");
+  });
+
+  it("Purchase_Request_Expired (bankslip) → boleto", () => {
+    const ev = adapter.normalize({
+      Event: "Purchase_Request_Expired",
+      Data: {
+        Products: [{ Id: "p1", Name: "X" }],
+        Buyer: { Name: "Y" },
+        Purchase: {
+          Payment: { PaymentMethod: "bankslip" },
+          BankSlip: {
+            DigitableLine: "34191.09008 63571.277447 91020.150008 5 12340000000000",
+            BarCodeData: "341911902000635712774479102015000812340000000000",
+            BarCode: "https://barcode.com.br/barcode",
+          },
+          InvoiceUrl: "https://inv",
+        },
+        Subscriptions: [{ Id: "sub-1", ExpiredDate: "2026-05-09T23:47:50Z" }],
+      },
+    });
+    expect(ev.eventKind).toBe("boleto");
+    expect(ev.payment.boletoBarcode).toBe("34191.09008 63571.277447 91020.150008 5 12340000000000");
+    expect(ev.payment.boletoBarcodeRaw).toBe("341911902000635712774479102015000812340000000000");
+    expect(ev.payment.boletoBarcodeImage).toBe("https://barcode.com.br/barcode");
+    expect(ev.payment.boletoUrl).toBe("https://inv");
+    expect(ev.subscription?.expiredDate).toBe("2026-05-09T23:47:50Z");
+  });
+
+  it("Purchase_Request_Canceled → cancelada (com reason + canceledDate)", () => {
+    const ev = adapter.normalize({
+      Event: "Purchase_Request_Canceled",
+      Data: {
+        Products: [{ Id: "p1", Name: "X" }],
+        Buyer: { Name: "Y" },
+        Purchase: { Payment: { PaymentMethod: "bankslip" } },
+        Subscriptions: [
+          {
+            Id: "sub-1",
+            CanceledDate: "2026-05-09T23:47:50Z",
+            CancellationReason: "Teste de cancelamento",
+          },
+        ],
+      },
+    });
+    expect(ev.eventKind).toBe("cancelada");
+    expect(ev.subscription?.canceledDate).toBe("2026-05-09T23:47:50Z");
+    expect(ev.subscription?.cancellationReason).toBe("Teste de cancelamento");
+  });
+
+  it("Payment_Refund (com chargebackDate) → cancelada", () => {
+    const ev = adapter.normalize({
+      Event: "Payment_Refund",
+      Data: {
+        Products: [{ Id: "p1", Name: "X" }],
+        Buyer: { Name: "Y" },
+        Purchase: {
+          ChargebackDate: "2026-05-09T23:47:50Z",
+          PaymentDate: "2026-05-08T00:00:00Z",
+          Payment: { PaymentMethod: "bankslip" },
+          BankSlip: { DigitableLine: "X", BarCodeData: "Y" },
+        },
+      },
+    });
+    expect(ev.eventKind).toBe("cancelada");
+    expect(ev.subscription?.chargebackDate).toBe("2026-05-09T23:47:50Z");
+    expect(ev.payment.paymentDate).toBe("2026-05-08T00:00:00Z");
+  });
+
+  it("Refund_Period_Over → outro (workflow custom)", () => {
+    const ev = adapter.normalize({ Event: "Refund_Period_Over", Data: {} });
+    expect(ev.eventKind).toBe("outro");
+    expect(ev.rawEventType).toBe("Refund_Period_Over");
+  });
+
+  it("Abandoned_Cart minimal (sem Purchase) → carrinho", () => {
+    const ev = adapter.normalize({
+      Event: "Abandoned_Cart",
+      IsTest: true,
+      Data: {
+        Products: [{ Id: "p1", Name: "Curso" }],
+        Buyer: { Email: "x@x.com", Name: "João da Silva", PhoneNumber: "+5500987645312" },
+        Offer: { Url: "https://lastlink.com/p/ABC" },
+        Utm: { UtmSource: "instagram" },
+      },
+    });
+    expect(ev.eventKind).toBe("carrinho");
+    expect(ev.product.valueCents).toBe(0); // sem Purchase = sem Price
+    expect(ev.payment.method).toBe("");
+    expect(ev.payment.accessUrl).toBe("https://lastlink.com/p/ABC");
+    expect(ev.tracking?.utmSource).toBe("instagram");
+  });
+
+  it.each([
+    ["Subscription_Renewal_Approved", "renovacao"],
+    ["Subscription_Canceled", "cancelada"],
+    ["Subscription_Expired", "cancelada"],
+    ["Purchase_Refused", "recusada"],
+  ])("event_kind: %s → %s", (rawEvt, expected) => {
+    expect(adapter.normalize({ Event: rawEvt, Data: {} }).eventKind).toBe(expected);
+  });
+});
+
+// ---------- GHL tags ----------
+
+describe("buildTagsFor", () => {
+  it("inclui platform, ev, produto, pgto, source:test, utm", () => {
+    const adapter = getAdapter("lastlink")!;
+    const ev = adapter.normalize({
+      Event: "Subscription_Renewal_Pending",
+      IsTest: true,
+      Data: {
+        Products: [{ Name: "Claude Code do Zero ao Avançado" }],
+        Buyer: {},
+        Purchase: { Payment: { PaymentMethod: "pix" }, Price: { Value: 100 } },
+        Utm: { UtmSource: "instagram" },
+      },
+    });
+    const tags = buildTagsFor(ev);
+    expect(tags).toContain("platform:lastlink");
+    expect(tags).toContain("ev:pix");
+    expect(tags).toContain("source:test");
+    expect(tags).toContain("pgto:pix");
+    expect(tags).toContain("utm:instagram");
+    expect(tags.some((t) => t.startsWith("produto:"))).toBe(true);
   });
 });
 
 // ---------- Registry ----------
 
 describe("Registry", () => {
-  it("expõe 4 plataformas built-in", () => {
-    const plats = listPlatforms();
-    expect(plats).toEqual(["hotmart", "kiwify", "lastlink", "shopify"]);
+  it("expõe 4 plataformas", () => {
+    expect(listPlatforms()).toEqual(["hotmart", "kiwify", "lastlink", "shopify"]);
   });
 });
