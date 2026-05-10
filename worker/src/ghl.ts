@@ -118,6 +118,25 @@ export function buildTagsFor(ev: NormalizedEvent): string[] {
     const utm = ev.tracking.utmSource.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 30);
     if (utm) tags.push(`utm:${utm}`);
   }
+
+  // Tags específicas pra trigger limpo de workflows (evita ambiguidade entre
+  // ev:pix de "fatura criada" vs ev:pix de "expirado").
+  const raw = (ev.rawEventType || "").toLowerCase();
+  if (raw.includes("expired") || raw.includes("expirad")) {
+    if (ev.eventKind === "pix") tags.push("pix_expirado");
+    else if (ev.eventKind === "boleto") tags.push("boleto_expirado");
+    else tags.push("expirado");
+  }
+  if (raw.includes("canceled") || raw.includes("cancelled") || raw.includes("cancelad")) {
+    tags.push("pedido_cancelado");
+  }
+  if (raw.includes("refund") || raw.includes("reversal") || raw.includes("reversed") || raw.includes("chargeback")) {
+    tags.push("refund_solicitado");
+  }
+  if (raw.includes("refused") || raw.includes("failed") || raw.includes("recusad")) {
+    tags.push("pagamento_recusado");
+  }
+
   return tags;
 }
 

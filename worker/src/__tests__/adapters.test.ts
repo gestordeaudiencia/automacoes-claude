@@ -343,6 +343,44 @@ describe("buildTagsFor", () => {
     expect(tags).toContain("utm:instagram");
     expect(tags.some((t) => t.startsWith("produto:"))).toBe(true);
   });
+
+  it("Purchase_Request_Expired (pix) → tag pix_expirado", () => {
+    const adapter = getAdapter("lastlink")!;
+    const ev = adapter.normalize({
+      Event: "Purchase_Request_Expired",
+      Data: { Purchase: { Payment: { PaymentMethod: "pix" } }, Buyer: {} },
+    });
+    const tags = buildTagsFor(ev);
+    expect(tags).toContain("ev:pix");
+    expect(tags).toContain("pix_expirado");
+  });
+
+  it("Purchase_Request_Expired (bankslip) → tag boleto_expirado", () => {
+    const adapter = getAdapter("lastlink")!;
+    const ev = adapter.normalize({
+      Event: "Purchase_Request_Expired",
+      Data: { Purchase: { Payment: { PaymentMethod: "bankslip" } }, Buyer: {} },
+    });
+    expect(buildTagsFor(ev)).toContain("boleto_expirado");
+  });
+
+  it("Purchase_Request_Canceled → tag pedido_cancelado", () => {
+    const adapter = getAdapter("lastlink")!;
+    const ev = adapter.normalize({ Event: "Purchase_Request_Canceled", Data: { Buyer: {} } });
+    expect(buildTagsFor(ev)).toContain("pedido_cancelado");
+  });
+
+  it("Payment_Refund → tag refund_solicitado", () => {
+    const adapter = getAdapter("lastlink")!;
+    const ev = adapter.normalize({ Event: "Payment_Refund", Data: { Buyer: {} } });
+    expect(buildTagsFor(ev)).toContain("refund_solicitado");
+  });
+
+  it("Purchase_Refused → tag pagamento_recusado", () => {
+    const adapter = getAdapter("lastlink")!;
+    const ev = adapter.normalize({ Event: "Purchase_Refused", Data: { Buyer: {} } });
+    expect(buildTagsFor(ev)).toContain("pagamento_recusado");
+  });
 });
 
 // ---------- Registry ----------
